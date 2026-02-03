@@ -1,38 +1,84 @@
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ChevronLeft, Clock, Receipt } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-import Header from '@/components/header/header';
-import StatusBadge from '@/components/StatusBadge/StatusBadge';
-import { PedidoHistorico } from '@/models/PedidoHistorico';
-import { buscarPedidosHistorico } from '@/services/pedidoService';
+import { supabase } from '../lib/supabase';
 
-const pedidos: PedidoHistorico[] = buscarPedidosHistorico();
-
+interface Pedido {
+  id: string;
+  mesa: number;
+  status: string;
+  total: number;
+  criado_em: string;
+}
 
 export default function HistoricoScreen() {
   const router = useRouter();
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const renderPedido = ({ item }: { item: PedidoHistorico }) => (
+  const fetchPedidos = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('*')
+        .order('criado_em', { ascending: false });
+
+      if (error) throw error;
+      if (data) setPedidos(data);
+    } catch (error: any) {
+      Alert.alert('Erro', 'Erro ao carregar histórico: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPedidos();
+  }, []);
+
+  const formatarData = (dataString: string) => {
+    const data = new Date(dataString);
+    return data.toLocaleDateString('pt-BR') + ' - ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pendente': return '#F59E0B';
+      case 'entregue': return '#10B981';
+      case 'cancelado': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
+
+  const renderPedido = ({ item }: { item: Pedido }) => (
     <TouchableOpacity
       style={styles.pedidoCard}
       onPress={() => router.push({
         pathname: '/detalhes-pedido',
-        params: { pedidoId: item.id },
+        params: { pedidoId: item.id }
       })}
     >
-      <View style={styles.pedidoContent}>
-        <View style={styles.pedidoLeft}>
-          <Text style={styles.mesaLabel}>Mesa {item.mesa}</Text>
-          <Text style={styles.itensLabel}>{item.itens} itens</Text>
+      <View style={styles.pedidoHeader}>
+        <View style={styles.mesaBadge}>
+          <Text style={styles.mesaText}>Mesa {item.mesa}</Text>
         </View>
-
-        <View style={styles.pedidoCenter}>
-          <Text style={styles.dataLabel}>{item.data}</Text>
-          <StatusBadge status={item.status} />
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+            {item.status.toUpperCase()}
+          </Text>
         </View>
+      </View>
 
-        <View style={styles.pedidoRight}>
-          <Text style={styles.totalValue}>R$ {item.total.toFixed(2)}</Text>
+      <View style={styles.pedidoBody}>
+        <View style={styles.infoRow}>
+          <Clock size={16} color="#6B7280" />
+          <Text style={styles.dataText}>{formatarData(item.criado_em)}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Receipt size={16} color="#1C74D4" />
+          <Text style={styles.totalText}>R$ {Number(item.total).toFixed(2)}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -40,104 +86,70 @@ export default function HistoricoScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <Header titulo="Histórico" />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ChevronLeft size={28} color="#1C74D4" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Histórico</Text>
+        <TouchableOpacity onPress={fetchPedidos} style={styles.refreshButton}>
+          <Text style={styles.refreshText}>Atualizar</Text>
+        </TouchableOpacity>
+      </View>
 
-
-      {/* Lista de Pedidos */}
-      <FlatList<PedidoHistorico>
-        data={pedidos}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity>
-            <Text>{item.data}</Text>
-          </TouchableOpacity>
-        )}
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color="#1C74D4" style={{ marginTop: 50 }} />
+      ) : (
+        <FlatList
+          data={pedidos}
+          renderItem={renderPedido}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={<Text style={styles.emptyText}>Nenhum pedido encontrado.</Text>}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 20,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    padding: 16, 
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 50
   },
-  backButton: {
-    padding: 8,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    textAlign: 'center',
-  },
-  listContainer: {
-    padding: 16,
-    gap: 12,
-  },
-  pedidoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+  backButton: { padding: 8 },
+  title: { fontSize: 20, fontWeight: '700', color: '#111827' },
+  refreshButton: { padding: 8 },
+  refreshText: { color: '#1C74D4', fontWeight: '600' },
+  listContainer: { padding: 16 },
+  pedidoCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 12, 
+    padding: 16, 
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    elevation: 2
   },
-  pedidoContent: {
-    flexDirection: 'row',
+  pedidoHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
     alignItems: 'center',
-    justifyContent: 'space-between',
+    marginBottom: 12
   },
-  pedidoLeft: {
-    minWidth: 70,
-  },
-  mesaLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1C74D4',
-    marginBottom: 4,
-  },
-  itensLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  pedidoCenter: {
-    flex: 1,
-    marginHorizontal: 12,
-    alignItems: 'center',
-  },
-  dataLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  pedidoRight: {
-    alignItems: 'flex-end',
-  },
-  totalValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C74D4',
-  },
+  mesaBadge: { backgroundColor: '#1C74D4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  mesaText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusText: { fontSize: 12, fontWeight: '700' },
+  pedidoBody: { gap: 8 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dataText: { color: '#6B7280', fontSize: 14 },
+  totalText: { color: '#111827', fontSize: 16, fontWeight: '700' },
+  emptyText: { textAlign: 'center', marginTop: 40, color: '#6B7280' }
 });

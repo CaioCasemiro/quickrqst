@@ -1,143 +1,126 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Users } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
+interface Mesa {
+  id: string;
+  numero: number;
+  ativa: boolean;
+}
 
 export default function MesasScreen() {
   const router = useRouter();
+  const [mesas, setMesas] = useState<Mesa[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const mesas = Array.from({ length: 12 }, (_, i) => ({
-    id: i + 1,
-    numero: i + 1,
-    status: Math.random() > 0.5 ? 'livre' : 'ocupada',
-  }));
+  const fetchMesas = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('mesas')
+        .select('*')
+        .order('numero', { ascending: true });
+
+      if (error) throw error;
+      if (data) setMesas(data);
+    } catch (error: any) {
+      Alert.alert('Erro', 'Erro ao carregar mesas: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMesas();
+  }, []);
+
+  const renderMesa = ({ item }: { item: Mesa }) => (
+    <TouchableOpacity
+      style={[styles.mesaCard, !item.ativa && styles.mesaInativa]}
+      onPress={() => {
+        if (item.ativa) {
+          router.push({
+            pathname: '/novo-pedido',
+            params: { mesaId: item.id, mesaNumero: item.numero }
+          });
+        } else {
+          Alert.alert('Mesa Ocupada', 'Esta mesa já possui um pedido em aberto.');
+        }
+      }}
+    >
+      <View style={styles.mesaIcon}>
+        <Users size={24} color={item.ativa ? '#1C74D4' : '#9CA3AF'} />
+      </View>
+      <Text style={[styles.mesaNumero, !item.ativa && styles.textInativo]}>Mesa {item.numero}</Text>
+      <View style={[styles.statusBadge, { backgroundColor: item.ativa ? '#D1FAE5' : '#FEE2E2' }]}>
+        <Text style={[styles.statusText, { color: item.ativa ? '#059669' : '#EF4444' }]}>
+          {item.ativa ? 'Livre' : 'Ocupada'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
-      {/* Header com botão voltar */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={28} color="#1C74D4" strokeWidth={2} />
+          <ChevronLeft size={28} color="#1C74D4" />
         </TouchableOpacity>
         <Text style={styles.title}>Mesas</Text>
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.gridContainer}>
-        {mesas.map((mesa) => (
-          <TouchableOpacity
-            key={mesa.id}
-            style={[
-              styles.mesaCard,
-              mesa.status === 'ocupada' && styles.mesaOcupada,
-            ]}
-            onPress={() => {
-              if (mesa.status === 'livre') {
-                router.push({
-                  pathname: '/novo-pedido',
-                  params: { mesaId: mesa.id, mesaNumero: mesa.numero },
-                });
-              }
-            }}
-          >
-            <View
-              style={[
-                styles.statusBadge,
-                mesa.status === 'ocupada' && styles.statusOcupada,
-              ]}
-            >
-              <Text style={styles.mesaNumero}>{mesa.numero}</Text>
-            </View>
-            <Text style={styles.mesaStatus}>
-              {mesa.status === 'livre' ? 'Livre' : 'Ocupada'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator size="large" color="#1C74D4" style={{ marginTop: 50 }} />
+      ) : (
+        <FlatList
+          data={mesas}
+          renderItem={renderMesa}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.listContainer}
+          columnWrapperStyle={styles.columnWrapper}
+          ListEmptyComponent={<Text style={styles.emptyText}>Nenhuma mesa cadastrada no banco.</Text>}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 20,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    padding: 16, 
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 50
   },
-  backButton: {
-    padding: 8,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  mesaCard: {
-    width: '31%',
-    aspectRatio: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+  backButton: { padding: 8 },
+  title: { fontSize: 20, fontWeight: '700', color: '#111827' },
+  listContainer: { padding: 16 },
+  columnWrapper: { justifyContent: 'space-between' },
+  mesaCard: { 
+    backgroundColor: '#FFF', 
+    width: '48%', 
+    padding: 20, 
+    borderRadius: 16, 
+    alignItems: 'center', 
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    elevation: 2
   },
-  mesaOcupada: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-  },
-  statusBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  statusOcupada: {
-    backgroundColor: '#FECACA',
-  },
-  mesaNumero: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1C74D4',
-  },
-  mesaStatus: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
+  mesaInativa: { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
+  mesaIcon: { marginBottom: 12 },
+  mesaNumero: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  textInativo: { color: '#6B7280' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  emptyText: { textAlign: 'center', marginTop: 40, color: '#6B7280' }
 });

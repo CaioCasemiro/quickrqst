@@ -1,151 +1,180 @@
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, TextInput, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  Modal,
+  TextInput,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Plus, Trash2, Edit } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase'; // Ajuste o caminho se necessário
 
 interface Produto {
   id: string;
   nome: string;
-  categoria: string;
   preco: number;
   ativo: boolean;
 }
 
 export default function ProdutosScreen() {
   const router = useRouter();
-  const [produtos, setProdutos] = useState<Produto[]>([
-    { id: '1', nome: 'Refrigerante', categoria: 'Bebidas', preco: 5.0, ativo: true },
-    { id: '2', nome: 'Suco Natural', categoria: 'Bebidas', preco: 7.0, ativo: true },
-    { id: '3', nome: 'Hambúrguer', categoria: 'Lanches', preco: 18.0, ativo: false },
-  ]);
-
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editando, setEditando] = useState<Produto | null>(null);
   const [form, setForm] = useState({
     nome: '',
-    categoria: 'Bebidas',
     preco: '',
   });
 
-  const categorias = ['Bebidas', 'Porções', 'Lanches', 'Pratos'];
+  // 1. BUSCAR PRODUTOS (READ)
+  const fetchProdutos = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('produtos')
+        .select('*')
+        .order('nome', { ascending: true });
+
+      if (error) throw error;
+      if (data) setProdutos(data);
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        'Não foi possível carregar os produtos: ' + error.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProdutos();
+  }, []);
 
   const handleAbrirModal = (produto?: Produto) => {
     if (produto) {
       setEditando(produto);
       setForm({
         nome: produto.nome,
-        categoria: produto.categoria,
         preco: produto.preco.toString(),
       });
     } else {
       setEditando(null);
-      setForm({ nome: '', categoria: 'Bebidas', preco: '' });
+      setForm({ nome: '', preco: '' });
     }
     setModalVisible(true);
   };
 
-  const handleSalvar = () => {
+  // 2. SALVAR OU EDITAR (CREATE / UPDATE)
+  const handleSalvar = async () => {
     if (!form.nome || !form.preco) {
-      alert('Preencha todos os campos');
+      Alert.alert('Erro', 'Preencha todos os campos.');
       return;
     }
 
-    if (editando) {
-      setProdutos(
-        produtos.map((p) =>
-          p.id === editando.id
-            ? {
-                ...p,
-                nome: form.nome,
-                categoria: form.categoria,
-                preco: parseFloat(form.preco),
-              }
-            : p
-        )
-      );
-    } else {
-      const novoProduto: Produto = {
-        id: Date.now().toString(),
+    try {
+      const payload: any = {
         nome: form.nome,
-        categoria: form.categoria,
-        preco: parseFloat(form.preco),
-        ativo: true,
+        preco: parseFloat(form.preco.replace(',', '.')),
+        ativo: editando ? editando.ativo : true,
       };
-      setProdutos([...produtos, novoProduto]);
-    }
 
-    setModalVisible(false);
+      if (editando) {
+        payload.id = editando.id;
+      }
+
+      const { error } = await supabase.from('produtos').upsert(payload);
+
+      if (error) throw error;
+
+      Alert.alert(
+        'Sucesso',
+        `Produto ${editando ? 'atualizado' : 'criado'} com sucesso!`
+      );
+      setModalVisible(false);
+      fetchProdutos();
+    } catch (error: any) {
+      Alert.alert('Erro ao salvar', error.message);
+    }
   };
 
-  const handleDeletar = (id: string) => {
-    if (confirm('Tem certeza que deseja deletar este produto?')) {
-      setProdutos(produtos.filter((p) => p.id !== id));
-    }
+  // 3. EXCLUIR (DELETE)
+  const handleExcluir = async (id: string) => {
+    Alert.alert('Confirmar', 'Deseja realmente excluir este produto?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase
+            .from('produtos')
+            .delete()
+            .eq('id', id);
+
+          if (error) Alert.alert('Erro', error.message);
+          else fetchProdutos();
+        },
+      },
+    ]);
   };
 
-  const handleToggleAtivo = (id: string) => {
-    setProdutos(
-      produtos.map((p) =>
-        p.id === id ? { ...p, ativo: !p.ativo } : p
-      )
-    );
+  // 4. ALTERAR STATUS (UPDATE)
+  const toggleAtivo = async (produto: Produto) => {
+    const { error } = await supabase
+      .from('produtos')
+      .update({ ativo: !produto.ativo })
+      .eq('id', produto.id);
+
+    if (error) Alert.alert('Erro', error.message);
+    else fetchProdutos();
   };
 
   const renderProduto = ({ item }: { item: Produto }) => (
     <View style={styles.produtoCard}>
       <View style={styles.produtoInfo}>
         <Text style={styles.produtoNome}>{item.nome}</Text>
-        <View style={styles.produtoMeta}>
-          <Text style={styles.categoria}>{item.categoria}</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: item.ativo ? '#DBEAFE' : '#FEE2E2' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                { color: item.ativo ? '#1C74D4' : '#EF4444' },
-              ]}
-            >
-              {item.ativo ? 'Ativo' : 'Inativo'}
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.produtoPreco}>
+          R$ {Number(item.preco).toFixed(2)}
+        </Text>
       </View>
 
-      <View style={styles.produtoPreco}>
-        <Text style={styles.preco}>R$ {item.preco.toFixed(2)}</Text>
-      </View>
-
-      <View style={styles.produtoActions}>
+      <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleToggleAtivo(item.id)}
+          style={[
+            styles.statusBadge,
+            { backgroundColor: item.ativo ? '#D1FAE5' : '#F3F4F6' },
+          ]}
+          onPress={() => toggleAtivo(item)}
         >
-          <View
+          <Text
             style={[
-              styles.toggleButton,
-              { backgroundColor: item.ativo ? '#10B981' : '#9CA3AF' },
+              styles.statusText,
+              { color: item.ativo ? '#059669' : '#6B7280' },
             ]}
           >
-            <Text style={styles.toggleText}>{item.ativo ? '✓' : '✕'}</Text>
-          </View>
+            {item.ativo ? 'Ativo' : 'Inativo'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionButton}
           onPress={() => handleAbrirModal(item)}
+          style={styles.iconButton}
         >
-          <Edit size={20} color="#1C74D4" strokeWidth={2} />
+          <Edit size={20} color="#1C74D4" />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleDeletar(item.id)}
+          onPress={() => handleExcluir(item.id)}
+          style={styles.iconButton}
         >
-          <Trash2 size={20} color="#EF4444" strokeWidth={2} />
+          <Trash2 size={20} color="#EF4444" />
         </TouchableOpacity>
       </View>
     </View>
@@ -153,101 +182,78 @@ export default function ProdutosScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={28} color="#1C74D4" strokeWidth={2} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <ChevronLeft size={28} color="#1C74D4" />
         </TouchableOpacity>
+
         <Text style={styles.title}>Produtos</Text>
+
         <TouchableOpacity
           onPress={() => handleAbrirModal()}
           style={styles.addButton}
         >
-          <Plus size={28} color="#1C74D4" strokeWidth={2} />
+          <Plus size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Lista de Produtos */}
-      <FlatList
-        data={produtos}
-        renderItem={renderProduto}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        scrollEnabled={true}
-      />
+      {loading ? (
+        <ActivityIndicator
+          size="large"
+          color="#1C74D4"
+          style={{ marginTop: 50 }}
+        />
+      ) : (
+        <FlatList
+          data={produtos}
+          renderItem={renderProduto}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              Nenhum produto cadastrado.
+            </Text>
+          }
+        />
+      )}
 
-      {/* Modal de Edição */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editando ? 'Editar Produto' : 'Novo Produto'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.modalTitle}>
+              {editando ? 'Editar Produto' : 'Novo Produto'}
+            </Text>
 
-            <ScrollView style={styles.modalForm}>
-              <Text style={styles.label}>Nome</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Nome do produto"
-                value={form.nome}
-                onChangeText={(text) => setForm({ ...form, nome: text })}
-              />
+            <TextInput
+              style={styles.input}
+              placeholder="Nome do Produto"
+              value={form.nome}
+              onChangeText={(t) => setForm({ ...form, nome: t })}
+            />
 
-              <Text style={styles.label}>Categoria</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriasScroll}
-              >
-                {categorias.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoriaOption,
-                      form.categoria === cat && styles.categoriaOptionActive,
-                    ]}
-                    onPress={() => setForm({ ...form, categoria: cat })}
-                  >
-                    <Text
-                      style={[
-                        styles.categoriaOptionText,
-                        form.categoria === cat && styles.categoriaOptionTextActive,
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+            <TextInput
+              style={styles.input}
+              placeholder="Preço (ex: 15.50)"
+              value={form.preco}
+              onChangeText={(t) => setForm({ ...form, preco: t })}
+              keyboardType="numeric"
+            />
 
-              <Text style={styles.label}>Preço</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0.00"
-                value={form.preco}
-                onChangeText={(text) => setForm({ ...form, preco: text })}
-                keyboardType="decimal-pad"
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
+            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={styles.cancelButton}
                 onPress={() => setModalVisible(false)}
+                style={styles.cancelButton}
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSalvar}>
+
+              <TouchableOpacity
+                onPress={handleSalvar}
+                style={styles.saveButton}
+              >
                 <Text style={styles.saveButtonText}>Salvar</Text>
               </TouchableOpacity>
             </View>
@@ -261,225 +267,125 @@ export default function ProdutosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F9FAFB'
   },
   header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 20,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingTop: 50,
   },
   backButton: {
-    padding: 8,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 8
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    textAlign: 'center',
+    color: '#111827'
   },
   addButton: {
+    backgroundColor: '#1C74D4',
     padding: 8,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 8
   },
   listContainer: {
-    padding: 16,
-    gap: 12,
+    padding: 16
   },
   produtoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: '#FFF',
     padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
   },
   produtoInfo: {
-    flex: 1,
+    flex: 1
   },
   produtoNome: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: '#111827'
   },
-  produtoMeta: {
+  produtoPreco: {
+    fontSize: 14,
+    color: '#1C74D4',
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  categoria: {
-    fontSize: 12,
-    color: '#6B7280',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    gap: 12
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 6
   },
   statusText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '600'
   },
-  produtoPreco: {
-    minWidth: 80,
-    alignItems: 'flex-end',
+  iconButton: {
+    padding: 4
   },
-  preco: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1C74D4',
-  },
-  produtoActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  closeButton: {
-    fontSize: 28,
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 40,
     color: '#6B7280',
   },
-  modalForm: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
     padding: 20,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-    marginTop: 16,
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16
   },
   input: {
     backgroundColor: '#F3F4F6',
+    padding: 12,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginBottom: 12,
   },
-  categoriasScroll: {
-    gap: 8,
-    paddingBottom: 8,
-  },
-  categoriaOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  categoriaOptionActive: {
-    backgroundColor: '#1C74D4',
-    borderColor: '#1C74D4',
-  },
-  categoriaOptionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  categoriaOptionTextActive: {
-    color: '#FFFFFF',
-  },
-  modalFooter: {
+  modalButtons: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    marginTop: 8
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
+    padding: 14,
+    alignItems: 'center'
   },
   cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
     color: '#6B7280',
+    fontWeight: '600'
   },
   saveButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
     backgroundColor: '#1C74D4',
+    padding: 14,
+    borderRadius: 8,
     alignItems: 'center',
   },
   saveButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#FFF',
+    fontWeight: '600'
   },
 });
