@@ -1,9 +1,14 @@
+// Componentes do React Native para estrutura e interação
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+// Hook do expo-router para navegação programática
 import { useRouter } from 'expo-router';
+// Ícones usados na tela (voltar, confirmar, cancelar, relógio)
 import { ChevronLeft, CheckCircle2, XCircle, Clock } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+// Cliente Supabase para operações nas tabelas `pedidos` e `mesas`
 import { supabase } from '../lib/supabase';
 
+// Tipagem local para representar os pedidos retornados do banco
 interface Pedido {
   id: string;
   mesa: number;
@@ -12,15 +17,19 @@ interface Pedido {
   criado_em: string;
 }
 
+// Componente que lista pedidos ativos (pendentes / em preparo)
 export default function PedidosAtivosScreen() {
+  // Router para ações de navegação (voltar, etc.)
   const router = useRouter();
+  // Estado com lista de pedidos e flag de carregamento
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Busca pedidos ativos no Supabase (status pendente ou em preparo)
   const fetchPedidosAtivos = async () => {
     try {
       setLoading(true);
-      // Buscamos apenas pedidos que NÃO foram finalizados (entregues ou cancelados)
+      // Buscamos apenas pedidos que NÃO foram finalizados (entregue/cancelado)
       const { data, error } = await supabase
         .from('pedidos')
         .select('*')
@@ -30,20 +39,22 @@ export default function PedidosAtivosScreen() {
       if (error) throw error;
       if (data) setPedidos(data);
     } catch (error: any) {
+      // Mostra alerta amigável em caso de falha na requisição
       Alert.alert('Erro', 'Erro ao carregar pedidos ativos: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // Carrega os pedidos ao montar o componente
   useEffect(() => {
     fetchPedidosAtivos();
   }, []);
 
-  // FUNÇÃO PARA ATUALIZAR STATUS E LIBERAR MESA
+  // Atualiza o status de um pedido e, se for finalizado, libera a mesa
   const atualizarStatus = async (pedido: Pedido, novoStatus: string) => {
     try {
-      // 1. Atualiza o status do pedido
+      // 1) Atualiza o status do pedido na tabela `pedidos`
       const { error: erroPedido } = await supabase
         .from('pedidos')
         .update({ status: novoStatus })
@@ -51,7 +62,7 @@ export default function PedidosAtivosScreen() {
 
       if (erroPedido) throw erroPedido;
 
-      // 2. Se o pedido foi finalizado, liberamos a mesa
+      // 2) Se o pedido terminou (entregue ou cancelado), atualiza a mesa para `ativa=true`
       if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
         const { error: erroMesa } = await supabase
           .from('mesas')
@@ -61,17 +72,20 @@ export default function PedidosAtivosScreen() {
         if (erroMesa) throw erroMesa;
       }
 
+      // Notifica o usuário e recarrega a lista de pedidos
       Alert.alert('Sucesso', `Pedido da Mesa ${pedido.mesa} marcado como ${novoStatus}.`);
-      fetchPedidosAtivos(); // Recarrega a lista
+      fetchPedidosAtivos();
     } catch (error: any) {
       Alert.alert('Erro', 'Não foi possível atualizar: ' + error.message);
     }
   };
 
+  // Renderiza o cartão de cada pedido na lista
   const renderPedido = ({ item }: { item: Pedido }) => (
     <View style={styles.pedidoCard}>
       <View style={styles.pedidoHeader}>
         <View style={styles.mesaInfo}>
+          {/* Número da mesa e horário do pedido */}
           <Text style={styles.mesaLabel}>Mesa {item.mesa}</Text>
           <View style={styles.timeRow}>
             <Clock size={14} color="#6B7280" />
@@ -80,9 +94,11 @@ export default function PedidosAtivosScreen() {
             </Text>
           </View>
         </View>
+        {/* Valor total do pedido */}
         <Text style={styles.totalText}>R$ {Number(item.total).toFixed(2)}</Text>
       </View>
 
+      {/* Botões de ação: cancelar ou marcar como entregue */}
       <View style={styles.actions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.cancelBtn]} 
@@ -103,6 +119,7 @@ export default function PedidosAtivosScreen() {
     </View>
   );
 
+  // Render principal do componente
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -115,6 +132,7 @@ export default function PedidosAtivosScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Se estiver carregando, mostra indicador; caso contrário exibe a lista */}
       {loading ? (
         <ActivityIndicator size="large" color="#1C74D4" style={{ marginTop: 50 }} />
       ) : (

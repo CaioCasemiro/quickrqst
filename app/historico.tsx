@@ -1,9 +1,14 @@
+// Componentes do React Native para construção de interface e interação
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+// Hook do expo-router para navegação programática
 import { useRouter } from 'expo-router';
+// Ícones vetoriais usados na lista (seta, relógio, recibo)
 import { ChevronLeft, Clock, Receipt } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+// Cliente Supabase para buscar dados do backend/local DB
 import { supabase } from '../lib/supabase';
 
+// Tipagem local para representar um pedido vindo do banco
 interface Pedido {
   id: string;
   mesa: number;
@@ -13,10 +18,13 @@ interface Pedido {
 }
 
 export default function HistoricoScreen() {
+  // Router para navegação (voltar, abrir detalhes)
   const router = useRouter();
+  // Estado local: lista de pedidos e indicador de carregamento
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Função que busca pedidos do Supabase ordenados por data de criação
   const fetchPedidos = async () => {
     try {
       setLoading(true);
@@ -28,21 +36,25 @@ export default function HistoricoScreen() {
       if (error) throw error;
       if (data) setPedidos(data);
     } catch (error: any) {
+      // Mostra um alerta amigável em caso de erro
       Alert.alert('Erro', 'Erro ao carregar histórico: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // Chama a busca ao montar o componente (componenteDidMount)
   useEffect(() => {
     fetchPedidos();
   }, []);
 
+  // Formata a data para o padrão pt-BR com hora minuto
   const formatarData = (dataString: string) => {
     const data = new Date(dataString);
     return data.toLocaleDateString('pt-BR') + ' - ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Retorna uma cor baseada no status do pedido (usada no badge)
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pendente': return '#F59E0B';
@@ -52,6 +64,7 @@ export default function HistoricoScreen() {
     }
   };
 
+  // Renderiza um item da lista (um pedido) como cartão clicável
   const renderPedido = ({ item }: { item: Pedido }) => (
     <TouchableOpacity
       style={styles.pedidoCard}
@@ -60,10 +73,12 @@ export default function HistoricoScreen() {
         params: { pedidoId: item.id }
       })}
     >
+      {/* Cabeçalho do cartão: mostra mesa e status */}
       <View style={styles.pedidoHeader}>
         <View style={styles.mesaBadge}>
           <Text style={styles.mesaText}>Mesa {item.mesa}</Text>
         </View>
+        {/* Badge de status com cor de fundo semitransparente */}
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
           <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
             {item.status.toUpperCase()}
@@ -71,6 +86,7 @@ export default function HistoricoScreen() {
         </View>
       </View>
 
+      {/* Corpo do cartão: data/hora e valor total */}
       <View style={styles.pedidoBody}>
         <View style={styles.infoRow}>
           <Clock size={16} color="#6B7280" />

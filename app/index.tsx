@@ -1,15 +1,23 @@
+// Componentes do React Native usados na tela de login
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+// Hook do expo-router para navegação (push, replace, back)
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+// Cliente Supabase para autenticação
 import { supabase } from '../lib/supabase'; // Certifique-se de que o caminho está correto
 
+// Tela de login da aplicação
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState(''); // Mudei de 'login' para 'email' pois o Supabase usa email por padrão
+
+  // Estados locais para o e-mail, senha e indicador de carregamento
+  const [email, setEmail] = useState(''); // Supabase autentica por e-mail
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Função que realiza o login via Supabase
   const handleLogin = async () => {
+    // Validação simples: campos obrigatórios
     if (!email || !senha) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos.');
       return;
@@ -18,30 +26,35 @@ export default function LoginScreen() {
     setLoading(true);
     
     try {
+      // Chamada ao SDK do Supabase para autenticar com e-mail e senha
       const { error } = await supabase.auth.signInWithPassword({
         email: email,
         password: senha,
       });
 
       if (error) {
+        // Mostra mensagem amigável em caso de falha
         Alert.alert('Erro no Login', error.message);
       } else {
-        // Login bem-sucedido, redireciona para a home
+        // Login bem-sucedido: substitui a rota atual pela home
         router.replace('/home');
       }
     } catch (err) {
+      // Erro inesperado genérico
       Alert.alert('Erro', 'Ocorreu um erro inesperado ao tentar fazer login.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Renderiza o formulário de login
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.logo}>QUICKRQST</Text>
 
         <View style={styles.form}>
+          {/* Campo de e-mail */}
           <TextInput
             style={styles.input}
             placeholder="E-mail"
@@ -53,6 +66,7 @@ export default function LoginScreen() {
             editable={!loading}
           />
 
+          {/* Campo de senha */}
           <TextInput
             style={styles.input}
             placeholder="Senha"
@@ -64,6 +78,7 @@ export default function LoginScreen() {
             editable={!loading}
           />
 
+          {/* Botão de envio: mostra `ActivityIndicator` enquanto carrega */}
           <TouchableOpacity 
             style={[styles.button, loading && { opacity: 0.7 }]} 
             onPress={handleLogin}
@@ -76,6 +91,7 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Link/ação para recuperar senha (ainda não implementado) */}
           <TouchableOpacity style={styles.forgotPassword} disabled={loading}>
             <Text style={styles.forgotPasswordText}>Esqueci a senha</Text>
           </TouchableOpacity>

@@ -1,45 +1,58 @@
+// Componentes básicos do React Native para estrutura e interação
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+// Hooks do expo-router: `useRouter` para navegação e `useLocalSearchParams`
+// para acessar parâmetros locais/consulta da rota (ex.: pedidoId)
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React from 'react';
+// Componentes personalizados da aplicação
 import Header from '@/components/header/header';
 import StatusBadge from '@/components/StatusBadge/StatusBadge';
 import ItemPedido from '@/components/ItemPedido/ItemPedido';
+// Serviço que busca um pedido por ID (aqui usado como mock/local)
 import { buscarPedidoPorId } from '@/services/pedidoService';
 
 
 
+// Tela que exibe os detalhes de um pedido específico
 export default function DetalhesPedidoScreen() {
+  // Router para navegação programática (voltar, mudar de tela, etc.)
   const router = useRouter();
+  // Parâmetros passados para a rota (esperamos `pedidoId` por exemplo)
   const params = useLocalSearchParams();
   const pedidoId = params.pedidoId;
 
-  // Mock data - em produção virá da API
+  // Aqui usamos um serviço local/mock `buscarPedidoPorId` para obter os dados
+  // do pedido pelo ID. Em um app real, isso faria uma chamada HTTP/async.
   const pedido = buscarPedidoPorId(pedidoId as string);
+
+  // Se não houver pedido com esse ID, mostramos uma mensagem simples.
   if (!pedido) {
     return <Text>Pedido não encontrado</Text>;
   }
 
-
-
+  // Handler que simula reenvio do pedido para a cozinha
   const handleReenviar = () => {
     alert('Pedido reenviado para a cozinha!');
   };
 
+  // Handler de cancelamento. Observação: `confirm` é uma função global do
+  // navegador; em React Native isso não existe por padrão — aqui está
+  // presumido como mock/simple. Em produção, substituir por Alert.alert.
   const handleCancelar = () => {
     if (confirm('Tem certeza que deseja cancelar este pedido?')) {
       alert('Pedido cancelado');
       router.back();
     }
   };
-
+ 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header com título */}
       <Header titulo="Detalhes do pedido" />
 
-
+      {/* Conteúdo principal rolável */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Informações Principais */}
+        {/* Cartão com informações principais do pedido (ID, mesa, status, hora) */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Pedido #</Text>
@@ -53,6 +66,7 @@ export default function DetalhesPedidoScreen() {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Status</Text>
+            {/* `StatusBadge` mostra visualmente o status (ex.: Pendente, Pronto) */}
             <StatusBadge status={pedido.status} />
           </View>
           <View style={styles.divider} />
@@ -62,7 +76,7 @@ export default function DetalhesPedidoScreen() {
           </View>
         </View>
 
-        {/* Itens */}
+        {/* Lista de itens do pedido: usamos o componente `ItemPedido` */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Itens</Text>
           {pedido.itens.map((item, index) => (
@@ -70,7 +84,7 @@ export default function DetalhesPedidoScreen() {
           ))}
         </View>
 
-        {/* Observações */}
+        {/* Observações do pedido, se houver */}
         {pedido.observacoes && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Observações</Text>
@@ -80,7 +94,7 @@ export default function DetalhesPedidoScreen() {
           </View>
         )}
 
-        {/* Total */}
+        {/* Resumo do total */}
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
@@ -89,7 +103,7 @@ export default function DetalhesPedidoScreen() {
         </View>
       </ScrollView>
 
-      {/* Botões de Ação */}
+      {/* Botões de ação no rodapé: reenviar e cancelar */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.reenviButton} onPress={handleReenviar}>
           <Text style={styles.reenviButtonText}>Reenviar para Cozinha</Text>

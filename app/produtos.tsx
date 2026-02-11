@@ -1,3 +1,4 @@
+// Componentes do React Native usados para construir a UI de produtos
 import {
   View,
   Text,
@@ -10,30 +11,38 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+// Hook para navegação programática
 import { useRouter } from 'expo-router';
+// Ícones para ações (voltar, adicionar, excluir, editar)
 import { ChevronLeft, Plus, Trash2, Edit } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+// Cliente Supabase para operações CRUD na tabela `produtos`
 import { supabase } from '../lib/supabase'; // Ajuste o caminho se necessário
 
+// Tipagem local representando a estrutura de um produto
 interface Produto {
   id: string;
   nome: string;
   preco: number;
-  ativo: boolean;
+  ativo: boolean; // true = disponível, false = escondido/inativo
 }
 
+// Tela de gerenciamento de produtos: lista, criar, editar, excluir e ativar/desativar
 export default function ProdutosScreen() {
   const router = useRouter();
+  // Estado local: lista de produtos e flags de UI
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  // `editando` guarda o produto atual em edição (ou null para criar novo)
   const [editando, setEditando] = useState<Produto | null>(null);
+  // Formulário local para nome/preço (strings para facilitar input)
   const [form, setForm] = useState({
     nome: '',
     preco: '',
   });
 
-  // 1. BUSCAR PRODUTOS (READ)
+  // 1) Buscar produtos do banco (READ)
   const fetchProdutos = async () => {
     try {
       setLoading(true);
@@ -45,6 +54,7 @@ export default function ProdutosScreen() {
       if (error) throw error;
       if (data) setProdutos(data);
     } catch (error: any) {
+      // Alerta amigável caso a requisição falhe
       Alert.alert(
         'Erro',
         'Não foi possível carregar os produtos: ' + error.message
@@ -54,10 +64,12 @@ export default function ProdutosScreen() {
     }
   };
 
+  // Carrega produtos ao montar o componente
   useEffect(() => {
     fetchProdutos();
   }, []);
 
+  // Abre modal para criar novo produto ou editar existente
   const handleAbrirModal = (produto?: Produto) => {
     if (produto) {
       setEditando(produto);
@@ -72,7 +84,7 @@ export default function ProdutosScreen() {
     setModalVisible(true);
   };
 
-  // 2. SALVAR OU EDITAR (CREATE / UPDATE)
+  // 2) Salvar ou editar produto (CREATE / UPDATE)
   const handleSalvar = async () => {
     if (!form.nome || !form.preco) {
       Alert.alert('Erro', 'Preencha todos os campos.');
@@ -80,16 +92,19 @@ export default function ProdutosScreen() {
     }
 
     try {
+      // Prepara payload com conversão de preço para number
       const payload: any = {
         nome: form.nome,
         preco: parseFloat(form.preco.replace(',', '.')),
         ativo: editando ? editando.ativo : true,
       };
 
+      // Se estivermos editando, inclui o id para upsert
       if (editando) {
         payload.id = editando.id;
       }
 
+      // `upsert` cria ou atualiza com base na presença do id
       const { error } = await supabase.from('produtos').upsert(payload);
 
       if (error) throw error;
@@ -99,13 +114,13 @@ export default function ProdutosScreen() {
         `Produto ${editando ? 'atualizado' : 'criado'} com sucesso!`
       );
       setModalVisible(false);
-      fetchProdutos();
+      fetchProdutos(); // Recarrega lista
     } catch (error: any) {
       Alert.alert('Erro ao salvar', error.message);
     }
   };
 
-  // 3. EXCLUIR (DELETE)
+  // 3) Excluir produto (DELETE) com confirmação
   const handleExcluir = async (id: string) => {
     Alert.alert('Confirmar', 'Deseja realmente excluir este produto?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -125,7 +140,7 @@ export default function ProdutosScreen() {
     ]);
   };
 
-  // 4. ALTERAR STATUS (UPDATE)
+  // 4) Alterna se o produto está ativo/visível (UPDATE)
   const toggleAtivo = async (produto: Produto) => {
     const { error } = await supabase
       .from('produtos')
@@ -136,6 +151,7 @@ export default function ProdutosScreen() {
     else fetchProdutos();
   };
 
+  // Renderiza cada produto na lista com ações rápidas
   const renderProduto = ({ item }: { item: Produto }) => (
     <View style={styles.produtoCard}>
       <View style={styles.produtoInfo}>
@@ -146,6 +162,7 @@ export default function ProdutosScreen() {
       </View>
 
       <View style={styles.actions}>
+        {/* Botão para alternar disponibilidade */}
         <TouchableOpacity
           style={[
             styles.statusBadge,
@@ -163,6 +180,7 @@ export default function ProdutosScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/* Editar */}
         <TouchableOpacity
           onPress={() => handleAbrirModal(item)}
           style={styles.iconButton}
@@ -170,6 +188,7 @@ export default function ProdutosScreen() {
           <Edit size={20} color="#1C74D4" />
         </TouchableOpacity>
 
+        {/* Excluir */}
         <TouchableOpacity
           onPress={() => handleExcluir(item.id)}
           style={styles.iconButton}
@@ -180,6 +199,7 @@ export default function ProdutosScreen() {
     </View>
   );
 
+  // JSX da tela: header, lista de produtos e modal para criar/editar
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -192,6 +212,7 @@ export default function ProdutosScreen() {
 
         <Text style={styles.title}>Produtos</Text>
 
+        {/* Botão para abrir modal de criação */}
         <TouchableOpacity
           onPress={() => handleAbrirModal()}
           style={styles.addButton}
@@ -200,6 +221,7 @@ export default function ProdutosScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Indicador de carregamento ou lista de produtos */}
       {loading ? (
         <ActivityIndicator
           size="large"
@@ -220,6 +242,7 @@ export default function ProdutosScreen() {
         />
       )}
 
+      {/* Modal para criar/editar produto */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>

@@ -1,9 +1,15 @@
+// Componentes do React Native para construir a interface e interações
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert, ScrollView } from 'react-native';
+// Hooks do expo-router: `useRouter` para navegação e `useLocalSearchParams`
+// para obter parâmetros passados para a rota (ex.: mesaId/mesaNumero)
 import { useRouter, useLocalSearchParams } from 'expo-router';
+// Ícones usados na lista e botões (voltar, adicionar, remover, carrinho)
 import { ChevronLeft, Plus, Minus, ShoppingCart } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+// Cliente Supabase para acessar as tabelas `produtos`, `pedidos`, `mesas`
 import { supabase } from '../lib/supabase';
 
+// Tipagem para produtos retornados do banco
 interface Produto {
   id: string;
   nome: string;
@@ -11,6 +17,7 @@ interface Produto {
   ativo: boolean;
 }
 
+// Estrutura do item que é colocado no carrinho/localmente antes de enviar
 interface ItemPedido {
   produto_id: string;
   nome: string;
@@ -19,9 +26,12 @@ interface ItemPedido {
 }
 
 export default function NovoPedidoScreen() {
+  // Router para navegação entre telas
   const router = useRouter();
+  // Parâmetros locais da rota (espera-se `mesaId` e `mesaNumero` ao abrir)
   const { mesaId, mesaNumero } = useLocalSearchParams();
   
+  // Estados locais: produtos disponíveis, carrinho local, flags de loading/enviando
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carrinho, setCarrinho] = useState<ItemPedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +49,7 @@ export default function NovoPedidoScreen() {
       if (error) throw error;
       if (data) setProdutos(data);
     } catch (error: any) {
+      // Mostra alerta amigável em caso de falha ao buscar produtos
       Alert.alert('Erro', 'Erro ao carregar cardápio: ' + error.message);
     } finally {
       setLoading(false);
@@ -114,6 +125,7 @@ export default function NovoPedidoScreen() {
         { text: 'OK', onPress: () => router.replace('/home') }
       ]);
     } catch (error: any) {
+      // Em caso de erro, informa o usuário
       Alert.alert('Erro ao finalizar', error.message);
     } finally {
       setEnviando(false);
@@ -131,6 +143,7 @@ export default function NovoPedidoScreen() {
         </View>
         
         <View style={styles.controles}>
+          {/* Se houver quantidade do produto no carrinho, mostra controles de diminuir e a quantidade */}
           {qtdNoCarrinho > 0 && (
             <>
               <TouchableOpacity onPress={() => removerDoCarrinho(item.id)} style={styles.btnMinus}>
@@ -139,6 +152,7 @@ export default function NovoPedidoScreen() {
               <Text style={styles.qtdText}>{qtdNoCarrinho}</Text>
             </>
           )}
+          {/* Botão para adicionar 1 unidade ao carrinho */}
           <TouchableOpacity onPress={() => adicionarAoCarrinho(item)} style={styles.btnAdd}>
             <Plus size={20} color="#FFF" />
           </TouchableOpacity>

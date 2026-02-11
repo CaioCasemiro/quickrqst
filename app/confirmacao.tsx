@@ -1,21 +1,36 @@
+// Componentes básicos do React Native usados para estruturar a UI
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+// Hooks do expo-router: `useRouter` para navegar e `useLocalSearchParams`
+// para obter parâmetros passados via rota (query params / params locais).
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React from 'react';
+// Header customizado da aplicação
 import Header from '@/components/header/header';
+// Modelo (tipo) do item de pedido — usado para tipagem do carrinho
 import { ItemPedidoModel } from '@/models/ItemPedido';
+// Componente que renderiza cada item do pedido na lista
 import ItemPedido from '@/components/ItemPedido/ItemPedido';
 
 
 
+// Tela de confirmação de pedido — exibe mesa, itens e total antes de finalizar.
 export default function ConfirmacaoScreen() {
+  // Router para navegação programática
   const router = useRouter();
+  // Obtém parâmetros passados para esta rota (ex.: mesaNumero, carrinho, total)
   const params = useLocalSearchParams();
+
+  // Parâmetros esperados (vêm como strings via rota). Use nomes iguais
+  // aos definidos onde a rota é chamada.
   const mesaNumero = params.mesaNumero;
   const carrinhoJSON = params.carrinho as string;
   const total = params.total as string;
 
+  // Converte o JSON do carrinho em um array de `ItemPedidoModel`.
+  // Se não existir `carrinho`, inicia como array vazio.
   const carrinho: ItemPedidoModel[] = carrinhoJSON ? JSON.parse(carrinhoJSON) : [];
 
+  // Função chamada ao finalizar o pedido: notifica e navega para a home.
   const handleFinalizar = () => {
     alert('Pedido finalizado com sucesso!');
     router.push('/home');
@@ -23,18 +38,18 @@ export default function ConfirmacaoScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header da tela com título personalizado */}
       <Header titulo="Confirmar pedido" />
 
-
+      {/* Conteúdo rolável: mesa, itens e resumo de preços */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Mesa */}
+        {/* Cartão com número da mesa */}
         <View style={styles.mesaCard}>
           <Text style={styles.mesaLabel}>Mesa</Text>
           <Text style={styles.mesaNumero}>{mesaNumero}</Text>
         </View>
 
-        {/* Itens */}
+        {/* Lista de itens do pedido — usa o componente `ItemPedido` para cada item */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Itens do Pedido</Text>
           {carrinho.map((item) => (
@@ -42,7 +57,7 @@ export default function ConfirmacaoScreen() {
           ))}
         </View>
 
-        {/* Total */}
+        {/* Resumo de valores: subtotal e total */}
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Subtotal</Text>
@@ -56,11 +71,14 @@ export default function ConfirmacaoScreen() {
         </View>
       </ScrollView>
 
-      {/* Botões */}
+      {/* Área de ações (rodapé) com botões para editar ou finalizar o pedido */}
       <View style={styles.footer}>
+        {/* Volta para a tela anterior para editar o pedido */}
         <TouchableOpacity style={styles.editarButton} onPress={() => router.back()}>
           <Text style={styles.editarButtonText}>Editar Pedido</Text>
         </TouchableOpacity>
+
+        {/* Finaliza o pedido e navega para a home */}
         <TouchableOpacity style={styles.finalizarButton} onPress={handleFinalizar}>
           <Text style={styles.finalizarButtonText}>Finalizar Pedido</Text>
         </TouchableOpacity>

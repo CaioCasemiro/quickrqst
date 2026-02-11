@@ -1,13 +1,21 @@
+// Componentes básicos do React Native para estruturar a tela
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+// Hook do expo-router para navegação programática (push, back, etc.)
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+// Ícones usados nos cartões do dashboard
 import { Utensils, ClipboardList, Plus, History, Settings } from 'lucide-react-native';
 
+// Componente principal da tela inicial (dashboard) da aplicação
 export default function HomeScreen() {
+  // Router permite navegar para outras rotas do app
   const router = useRouter();
 
+  // Estrutura: header com título e botão de configurações/produtos,
+  // seguido por uma grade de cartões que levam às principais telas.
   return (
     <View style={styles.container}>
+      {/* Cabeçalho com logo/título e botão para a tela de produtos */}
       <View style={styles.header}>
         <View>
           <Text style={styles.logo}>QUICKRQST</Text>
@@ -17,11 +25,14 @@ export default function HomeScreen() {
           style={styles.settingsButton}
           onPress={() => router.push('/produtos')}
         >
+          {/* Ícone de configurações que navega para `/produtos` */}
           <Settings size={24} color="#1C74D4" strokeWidth={2} />
         </TouchableOpacity>
       </View>
 
+      {/* Grade de ações / atalhos principais da aplicação */}
       <View style={styles.grid}>
+        {/* Card: Mesas */}
         <TouchableOpacity
           style={styles.card}
           onPress={() => router.push('/mesas')}
@@ -33,6 +44,7 @@ export default function HomeScreen() {
           <Text style={styles.cardDescription}>Gerenciar mesas</Text>
         </TouchableOpacity>
 
+        {/* Card: Pedidos ativos */}
         <TouchableOpacity
           style={styles.card}
           onPress={() => router.push('/pedidos')}
@@ -44,10 +56,12 @@ export default function HomeScreen() {
           <Text style={styles.cardDescription}>Ver pedidos ativos</Text>
         </TouchableOpacity>
 
+        {/* Card principal em destaque: cria um novo pedido */}
         <TouchableOpacity
           style={[styles.card, styles.primaryCard]}
           onPress={() => router.push({
             pathname: '/novo-pedido',
+            // Exemplo: passa `mesaNumero` como parâmetro à rota
             params: { mesaNumero: '1' },
           })}
         >
@@ -58,6 +72,7 @@ export default function HomeScreen() {
           <Text style={styles.cardDescriptionPrimary}>Criar pedido rápido</Text>
         </TouchableOpacity>
 
+        {/* Card: Histórico de pedidos */}
         <TouchableOpacity
           style={styles.card}
           onPress={() => router.push('/historico')}

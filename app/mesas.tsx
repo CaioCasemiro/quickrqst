@@ -1,20 +1,29 @@
+// Componentes básicos do React Native usados para construir a UI
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+// Hook do expo-router para navegação programática entre telas
 import { useRouter } from 'expo-router';
+// Ícones vetoriais (seta para voltar, ícone de usuários/mesas)
 import { ChevronLeft, Users } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
+// Cliente Supabase para acessar dados (tabela `mesas`)
 import { supabase } from '../lib/supabase';
 
+// Tipagem local para representar uma mesa vinda do banco de dados
 interface Mesa {
   id: string;
   numero: number;
-  ativa: boolean;
+  ativa: boolean; // true = livre, false = ocupada
 }
 
 export default function MesasScreen() {
+  // Router para navegação (ex.: abrir novo pedido, voltar)
   const router = useRouter();
+  // Estado local: lista de mesas e indicador de loading enquanto busca dados
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Função que busca as mesas da tabela `mesas` no Supabase, ordenando
+  // pelo número da mesa. Em caso de erro, exibe alerta.
   const fetchMesas = async () => {
     try {
       setLoading(true);
@@ -32,10 +41,14 @@ export default function MesasScreen() {
     }
   };
 
+  // Carrega as mesas ao montar o componente
   useEffect(() => {
     fetchMesas();
   }, []);
 
+  // Renderiza cada cartão de mesa. Se a mesa estiver `ativa` (livre), ao
+  // tocar navega para a tela de novo pedido passando o id e número da mesa.
+  // Se não estiver ativa, exibe um alerta informando que já há pedido.
   const renderMesa = ({ item }: { item: Mesa }) => (
     <TouchableOpacity
       style={[styles.mesaCard, !item.ativa && styles.mesaInativa]}
@@ -50,10 +63,15 @@ export default function MesasScreen() {
         }
       }}
     >
+      {/* Ícone representando a mesa; cor muda conforme status */}
       <View style={styles.mesaIcon}>
         <Users size={24} color={item.ativa ? '#1C74D4' : '#9CA3AF'} />
       </View>
+
+      {/* Número da mesa; estilo muda se inativa */}
       <Text style={[styles.mesaNumero, !item.ativa && styles.textInativo]}>Mesa {item.numero}</Text>
+
+      {/* Badge visual indicando se a mesa está livre ou ocupada */}
       <View style={[styles.statusBadge, { backgroundColor: item.ativa ? '#D1FAE5' : '#FEE2E2' }]}>
         <Text style={[styles.statusText, { color: item.ativa ? '#059669' : '#EF4444' }]}>
           {item.ativa ? 'Livre' : 'Ocupada'}
