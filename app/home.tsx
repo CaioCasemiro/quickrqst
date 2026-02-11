@@ -59,11 +59,7 @@ export default function HomeScreen() {
         {/* Card principal em destaque: cria um novo pedido */}
         <TouchableOpacity
           style={[styles.card, styles.primaryCard]}
-          onPress={() => router.push({
-            pathname: '/novo-pedido',
-            // Exemplo: passa `mesaNumero` como parâmetro à rota
-            params: { mesaNumero: '1' },
-          })}
+          onPress={() => router.push('/mesas')}
         >
           <View style={styles.iconContainerPrimary}>
             <Plus size={40} color="#FFFFFF" strokeWidth={2} />
