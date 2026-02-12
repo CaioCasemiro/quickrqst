@@ -1,4 +1,3 @@
-// Componentes do React Native usados para construir a UI de produtos
 import {
   View,
   Text,
@@ -11,32 +10,24 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-// Hook para navegação programática
 import { useRouter } from 'expo-router';
-// Ícones para ações (voltar, adicionar, excluir, editar)
 import { ChevronLeft, Plus, Trash2, Edit } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-// Cliente Supabase para operações CRUD na tabela `produtos`
-import { supabase } from '../lib/supabase'; // Ajuste o caminho se necessário
+import { supabase } from '../lib/supabase';
 
-// Tipagem local representando a estrutura de um produto
 interface Produto {
   id: string;
   nome: string;
   preco: number;
-  ativo: boolean; // true = disponível, false = escondido/inativo
+  ativo: boolean;
 }
 
-// Tela de gerenciamento de produtos: lista, criar, editar, excluir e ativar/desativar
 export default function ProdutosScreen() {
   const router = useRouter();
-  // Estado local: lista de produtos e flags de UI
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  // `editando` guarda o produto atual em edição (ou null para criar novo)
   const [editando, setEditando] = useState<Produto | null>(null);
-  // Formulário local para nome/preço (strings para facilitar input)
   const [form, setForm] = useState({
     nome: '',
     preco: '',
@@ -54,7 +45,6 @@ export default function ProdutosScreen() {
       if (error) throw error;
       if (data) setProdutos(data);
     } catch (error: any) {
-      // Alerta amigável caso a requisição falhe
       Alert.alert(
         'Erro',
         'Não foi possível carregar os produtos: ' + error.message
@@ -92,19 +82,18 @@ export default function ProdutosScreen() {
     }
 
     try {
-      // Prepara payload com conversão de preço para number
+      // Guarda o que vai ser mandado para o BD
       const payload: any = {
         nome: form.nome,
         preco: parseFloat(form.preco.replace(',', '.')),
-        ativo: editando ? editando.ativo : true,
+        ativo: editando ? editando.ativo : true, // Se tiver editando, mantém o mesmo valor
       };
 
-      // Se estivermos editando, inclui o id para upsert
+      // Se estivermos editando, inclui o id no payload
       if (editando) {
         payload.id = editando.id;
       }
 
-      // `upsert` cria ou atualiza com base na presença do id
       const { error } = await supabase.from('produtos').upsert(payload);
 
       if (error) throw error;
@@ -114,7 +103,7 @@ export default function ProdutosScreen() {
         `Produto ${editando ? 'atualizado' : 'criado'} com sucesso!`
       );
       setModalVisible(false);
-      fetchProdutos(); // Recarrega lista
+      fetchProdutos();
     } catch (error: any) {
       Alert.alert('Erro ao salvar', error.message);
     }
@@ -142,13 +131,17 @@ export default function ProdutosScreen() {
 
   // 4) Alterna se o produto está ativo/visível (UPDATE)
   const toggleAtivo = async (produto: Produto) => {
-    const { error } = await supabase
-      .from('produtos')
-      .update({ ativo: !produto.ativo })
-      .eq('id', produto.id);
+    try {
+      const { error } = await supabase
+        .from('produtos')
+        .update({ ativo: !produto.ativo })
+        .eq('id', produto.id);
 
-    if (error) Alert.alert('Erro', error.message);
-    else fetchProdutos();
+      if (error) throw error;
+      fetchProdutos();
+    } catch (error: any) {
+      Alert.alert('Erro', error.message);
+    }
   };
 
   // Renderiza cada produto na lista com ações rápidas
