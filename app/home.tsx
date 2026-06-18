@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import React from 'react';
 // Ícones usados nos cartões do dashboard
-import { Utensils, ClipboardList, Plus, History, Settings } from 'lucide-react-native';
+import { Utensils, ClipboardList, Plus, History, Settings, UtensilsCrossed } from 'lucide-react-native';
 
 // Componente principal da tela inicial (dashboard) da aplicação
 export default function HomeScreen() {
@@ -66,6 +66,18 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.cardTitlePrimary}>Novo Pedido</Text>
           <Text style={styles.cardDescriptionPrimary}>Criar pedido rápido</Text>
+        </TouchableOpacity>
+
+        {/* Card: Cozinha (Novo) */}
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => router.push('/cozinha')}
+        >
+          <View style={styles.iconContainer}>
+            <UtensilsCrossed size={40} color="#1C74D4" strokeWidth={2} />
+          </View>
+          <Text style={styles.cardTitle}>Cozinha</Text>
+          <Text style={styles.cardDescription}>Monitor de pedidos</Text>
         </TouchableOpacity>
 
         {/* Card: Histórico de pedidos */}

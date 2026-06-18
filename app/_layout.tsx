@@ -39,6 +39,8 @@ export default function RootLayout() {
         <Stack.Screen name="detalhes-pedido" options={{ title: 'Detalhes' }} />
         {/* Catálogo de produtos */}
         <Stack.Screen name="produtos" options={{ title: 'Produtos' }} />
+        {/* Monitor da Cozinha (Novo) */}
+        <Stack.Screen name="cozinha" options={{ title: 'Cozinha' }} />
         {/* Rota especial do expo-router exibida quando a rota não é encontrada */}
         <Stack.Screen name="+not-found" />
       </Stack>
