@@ -4,12 +4,18 @@ import { ChevronLeft, CheckCircle2, Clock, UtensilsCrossed } from 'lucide-react-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+interface ItemPedido {
+    nome: string;
+    quantidade: number;
+}
+
 interface Pedido {
     id: string;
     mesa: number;
     status: string;
     total: number;
     criado_em: string;
+    itens_json?: string;
 }
 
 export default function CozinhaScreen() {
@@ -20,7 +26,6 @@ export default function CozinhaScreen() {
     const fetchPedidosCozinha = async () => {
         try {
             setLoading(true);
-            // Na cozinha, focamos em pedidos 'pendentes' (novos) e 'em preparo'
             const { data, error } = await supabase
                 .from('pedidos')
                 .select('*')
@@ -39,7 +44,6 @@ export default function CozinhaScreen() {
     useEffect(() => {
         fetchPedidosCozinha();
 
-        // Configura um canal de realtime para atualizar a tela automaticamente
         const channel = supabase
             .channel('pedidos_cozinha')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
@@ -60,70 +64,87 @@ export default function CozinhaScreen() {
                 .eq('id', id);
 
             if (error) throw error;
-
-            // A atualização da lista local será feita pelo canal de realtime ou pelo fetch abaixo
             fetchPedidosCozinha();
         } catch (error: any) {
             Alert.alert('Erro', 'Não foi possível atualizar o status: ' + error.message);
         }
     };
 
-    const renderPedido = ({ item }: { item: Pedido }) => (
-        <View style={[
-            styles.pedidoCard,
-            item.status === 'em preparo' ? styles.preparandoCard : styles.pendenteCard
-        ]}>
-            <View style={styles.pedidoHeader}>
-                <View>
-                    <Text style={styles.mesaLabel}>Mesa {item.mesa}</Text>
-                    <View style={styles.timeRow}>
-                        <Clock size={14} color="#6B7280" />
-                        <Text style={styles.timeText}>
-                            {new Date(item.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+    const renderPedido = ({ item }: { item: Pedido }) => {
+        let itens: ItemPedido[] = [];
+        try {
+            if (item.itens_json) {
+                itens = JSON.parse(item.itens_json);
+            }
+        } catch (e) {
+            console.error('Erro ao processar itens:', e);
+        }
+
+        return (
+            <View style={[
+                styles.pedidoCard,
+                item.status === 'em preparo' ? styles.preparandoCard : styles.pendenteCard
+            ]}>
+                <View style={styles.pedidoHeader}>
+                    <View>
+                        <Text style={styles.mesaLabel}>Mesa {item.mesa}</Text>
+                        <View style={styles.timeRow}>
+                            <Clock size={14} color="#6B7280" />
+                            <Text style={styles.timeText}>
+                                {new Date(item.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={[
+                        styles.statusBadge,
+                        item.status === 'em preparo' ? styles.statusBadgePreparo : styles.statusBadgePendente
+                    ]}>
+                        <Text style={styles.statusBadgeText}>
+                            {item.status === 'em preparo' ? 'EM PREPARO' : 'NOVO'}
                         </Text>
                     </View>
                 </View>
-                <View style={[
-                    styles.statusBadge,
-                    item.status === 'em preparo' ? styles.statusBadgePreparo : styles.statusBadgePendente
-                ]}>
-                    <Text style={styles.statusBadgeText}>
-                        {item.status === 'em preparo' ? 'EM PREPARO' : 'NOVO'}
-                    </Text>
+
+                <View style={styles.divider} />
+
+                <View style={styles.itensContainer}>
+                    <Text style={styles.itensTitle}>Itens do Pedido:</Text>
+                    {itens.length > 0 ? (
+                        itens.map((i, idx) => (
+                            <View key={idx} style={styles.itemRow}>
+                                <Text style={styles.itemQtd}>{i.quantidade}x</Text>
+                                <Text style={styles.itemNome}>{i.nome}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <Text style={styles.semItens}>Aviso: Detalhes dos itens não encontrados.</Text>
+                    )}
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.actions}>
+                    {item.status === 'pendente' ? (
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.prepararBtn]}
+                            onPress={() => atualizarStatus(item.id, 'em preparo')}
+                        >
+                            <UtensilsCrossed size={20} color="#FFF" />
+                            <Text style={styles.btnText}>Começar Preparo</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.concluirBtn]}
+                            onPress={() => atualizarStatus(item.id, 'pronto')}
+                        >
+                            <CheckCircle2 size={20} color="#FFF" />
+                            <Text style={styles.btnText}>Pedido Pronto</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
-
-            <View style={styles.divider} />
-
-            {/* Como o app atual não salva os itens individualmente no banco (apenas total e mesa), 
-          exibimos o resumo do pedido. Em uma versão futura, aqui listariam os itens. */}
-            <View style={styles.resumoContainer}>
-                <Text style={styles.resumoTitle}>Resumo do Pedido:</Text>
-                <Text style={styles.resumoText}>Valor Total: R$ {Number(item.total).toFixed(2)}</Text>
-                <Text style={styles.infoAviso}>* Itens do pedido devem ser conferidos no sistema do garçom ou ticket impresso.</Text>
-            </View>
-
-            <View style={styles.actions}>
-                {item.status === 'pendente' ? (
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.prepararBtn]}
-                        onPress={() => atualizarStatus(item.id, 'em preparo')}
-                    >
-                        <UtensilsCrossed size={20} color="#FFF" />
-                        <Text style={styles.btnText}>Começar Preparo</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.concluirBtn]}
-                        onPress={() => atualizarStatus(item.id, 'entregue')}
-                    >
-                        <CheckCircle2 size={20} color="#FFF" />
-                        <Text style={styles.btnText}>Pedido Pronto</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-        </View>
-    );
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -201,10 +222,12 @@ const styles = StyleSheet.create({
     statusBadgePreparo: { backgroundColor: '#DBEAFE' },
     statusBadgeText: { fontSize: 12, fontWeight: '800', color: '#92400E' },
     divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
-    resumoContainer: { marginBottom: 16 },
-    resumoTitle: { fontSize: 16, fontWeight: '700', color: '#374151', marginBottom: 4 },
-    resumoText: { fontSize: 18, color: '#1C74D4', fontWeight: '800' },
-    infoAviso: { fontSize: 12, color: '#9CA3AF', fontStyle: 'italic', marginTop: 8 },
+    itensContainer: { marginBottom: 8 },
+    itensTitle: { fontSize: 16, fontWeight: '700', color: '#374151', marginBottom: 8 },
+    itemRow: { flexDirection: 'row', marginBottom: 6, alignItems: 'center' },
+    itemQtd: { fontSize: 18, fontWeight: '800', color: '#1C74D4', width: 40 },
+    itemNome: { fontSize: 18, color: '#111827', fontWeight: '600' },
+    semItens: { color: '#EF4444', fontStyle: 'italic' },
     actions: { marginTop: 8 },
     actionButton: {
         flexDirection: 'row',

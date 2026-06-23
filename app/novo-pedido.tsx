@@ -1,15 +1,9 @@
-// Componentes do React Native para construir a interface e interações
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert, ScrollView } from 'react-native';
-// Hooks do expo-router: `useRouter` para navegação e `useLocalSearchParams`
-// para obter parâmetros passados para a rota (ex.: mesaId/mesaNumero)
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-// Ícones usados na lista e botões (voltar, adicionar, remover, carrinho)
 import { ChevronLeft, Plus, Minus, ShoppingCart } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-// Cliente Supabase para acessar as tabelas `produtos`, `pedidos`, `mesas`
 import { supabase } from '../lib/supabase';
 
-// Tipagem para produtos retornados do banco
 interface Produto {
   id: string;
   nome: string;
@@ -17,7 +11,6 @@ interface Produto {
   ativo: boolean;
 }
 
-// Estrutura do item que é colocado no carrinho/localmente antes de enviar
 interface ItemPedido {
   produto_id: string;
   nome: string;
@@ -26,18 +19,14 @@ interface ItemPedido {
 }
 
 export default function NovoPedidoScreen() {
-  // Router para navegação entre telas
   const router = useRouter();
-  // Parâmetros locais da rota (espera-se `mesaId` e `mesaNumero` ao abrir)
   const { mesaId, mesaNumero } = useLocalSearchParams();
-  
-  // Estados locais: produtos disponíveis, carrinho local, flags de loading/enviando
+
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carrinho, setCarrinho] = useState<ItemPedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
 
-  // 1. BUSCAR PRODUTOS ATIVOS
   const fetchProdutos = async () => {
     try {
       const { data, error } = await supabase
@@ -49,7 +38,6 @@ export default function NovoPedidoScreen() {
       if (error) throw error;
       if (data) setProdutos(data);
     } catch (error: any) {
-      // Mostra alerta amigável em caso de falha ao buscar produtos
       Alert.alert('Erro', 'Erro ao carregar cardápio: ' + error.message);
     } finally {
       setLoading(false);
@@ -64,17 +52,17 @@ export default function NovoPedidoScreen() {
     setCarrinho(prev => {
       const itemExistente = prev.find(item => item.produto_id === produto.id);
       if (itemExistente) {
-        return prev.map(item => 
-          item.produto_id === produto.id 
-            ? { ...item, quantidade: item.quantidade + 1 } 
+        return prev.map(item =>
+          item.produto_id === produto.id
+            ? { ...item, quantidade: item.quantidade + 1 }
             : item
         );
       }
-      return [...prev, { 
-        produto_id: produto.id, 
-        nome: produto.nome, 
-        quantidade: 1, 
-        preco_unitario: produto.preco 
+      return [...prev, {
+        produto_id: produto.id,
+        nome: produto.nome,
+        quantidade: 1,
+        preco_unitario: produto.preco
       }];
     });
   };
@@ -91,7 +79,6 @@ export default function NovoPedidoScreen() {
 
   const totalPedido = carrinho.reduce((acc, item) => acc + (item.preco_unitario * item.quantidade), 0);
 
-  // 2. FINALIZAR PEDIDO (CREATE NO SUPABASE)
   const handleFinalizarPedido = async () => {
     if (carrinho.length === 0) {
       Alert.alert('Carrinho Vazio', 'Adicione pelo menos um item ao pedido.');
@@ -100,20 +87,22 @@ export default function NovoPedidoScreen() {
 
     setEnviando(true);
     try {
-      // A. Criar o pedido na tabela 'pedidos'
+      // 1. Criar o pedido na tabela 'pedidos'
+      // Adicionamos o campo 'itens_json' para salvar a lista de itens de forma simples
       const { data: pedidoCriado, error: erroPedido } = await supabase
         .from('pedidos')
         .insert({
           mesa: Number(mesaNumero),
           status: 'pendente',
-          total: totalPedido
+          total: totalPedido,
+          itens_json: JSON.stringify(carrinho) // Salvando os itens como JSON
         })
         .select()
         .single();
 
       if (erroPedido) throw erroPedido;
 
-      // B. Atualizar a mesa para ocupada (ativa = false)
+      // 2. Atualizar a mesa para ocupada
       const { error: erroMesa } = await supabase
         .from('mesas')
         .update({ ativa: false })
@@ -125,7 +114,6 @@ export default function NovoPedidoScreen() {
         { text: 'OK', onPress: () => router.replace('/home') }
       ]);
     } catch (error: any) {
-      // Em caso de erro, informa o usuário
       Alert.alert('Erro ao finalizar', error.message);
     } finally {
       setEnviando(false);
@@ -141,9 +129,8 @@ export default function NovoPedidoScreen() {
           <Text style={styles.produtoNome}>{item.nome}</Text>
           <Text style={styles.produtoPreco}>R$ {Number(item.preco).toFixed(2)}</Text>
         </View>
-        
+
         <View style={styles.controles}>
-          {/* Se houver quantidade do produto no carrinho, mostra controles de diminuir e a quantidade */}
           {qtdNoCarrinho > 0 && (
             <>
               <TouchableOpacity onPress={() => removerDoCarrinho(item.id)} style={styles.btnMinus}>
@@ -152,7 +139,6 @@ export default function NovoPedidoScreen() {
               <Text style={styles.qtdText}>{qtdNoCarrinho}</Text>
             </>
           )}
-          {/* Botão para adicionar 1 unidade ao carrinho */}
           <TouchableOpacity onPress={() => adicionarAoCarrinho(item)} style={styles.btnAdd}>
             <Plus size={20} color="#FFF" />
           </TouchableOpacity>
@@ -189,8 +175,8 @@ export default function NovoPedidoScreen() {
             <Text style={styles.totalLabel}>Total:</Text>
             <Text style={styles.totalValue}>R$ {totalPedido.toFixed(2)}</Text>
           </View>
-          <TouchableOpacity 
-            style={[styles.finalizarBtn, enviando && { opacity: 0.7 }]} 
+          <TouchableOpacity
+            style={[styles.finalizarBtn, enviando && { opacity: 0.7 }]}
             onPress={handleFinalizarPedido}
             disabled={enviando}
           >
@@ -211,11 +197,11 @@ export default function NovoPedidoScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    padding: 16, 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -224,12 +210,12 @@ const styles = StyleSheet.create({
   backButton: { padding: 8 },
   title: { fontSize: 20, fontWeight: '700', color: '#111827' },
   listContainer: { padding: 16, paddingBottom: 120 },
-  produtoCard: { 
-    backgroundColor: '#FFF', 
-    padding: 16, 
-    borderRadius: 12, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  produtoCard: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
     borderWidth: 1,
@@ -242,27 +228,27 @@ const styles = StyleSheet.create({
   btnAdd: { backgroundColor: '#1C74D4', padding: 8, borderRadius: 8 },
   btnMinus: { backgroundColor: '#FEE2E2', padding: 8, borderRadius: 8 },
   qtdText: { fontSize: 16, fontWeight: '700', color: '#111827', minWidth: 20, textAlign: 'center' },
-  footer: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    backgroundColor: '#FFF', 
-    padding: 20, 
-    borderTopWidth: 1, 
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     elevation: 10
   },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   totalLabel: { fontSize: 16, color: '#6B7280' },
   totalValue: { fontSize: 22, fontWeight: '700', color: '#1C74D4' },
-  finalizarBtn: { 
-    backgroundColor: '#1C74D4', 
-    padding: 16, 
-    borderRadius: 12, 
-    flexDirection: 'row', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  finalizarBtn: {
+    backgroundColor: '#1C74D4',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   finalizarText: { color: '#FFF', fontSize: 18, fontWeight: '600' },
   emptyText: { textAlign: 'center', marginTop: 40, color: '#6B7280' }

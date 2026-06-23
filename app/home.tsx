@@ -71,7 +71,7 @@ export default function HomeScreen() {
         {/* Card: Cozinha (Novo) */}
         <TouchableOpacity
           style={styles.card}
-          onPress={() => router.push('/cozinha')}
+          onPress={() => router.push('/cozinha' as any)}
         >
           <View style={styles.iconContainer}>
             <UtensilsCrossed size={40} color="#1C74D4" strokeWidth={2} />

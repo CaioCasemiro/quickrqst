@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Users, Plus, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Users, Plus, LogOut } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -38,47 +38,53 @@ export default function MesasScreen() {
     fetchMesas();
   }, []);
 
-  // FUNÇÃO PARA ADICIONAR NOVA MESA (CREATE)
   const handleAdicionarMesa = async () => {
-  if (!novoNumero) {
-    Alert.alert('Aviso', 'Digite o número da mesa.');
-    return;
-  }
-
-  try {
-    console.log('Tentando adicionar mesa:', novoNumero);
-    
-    const { data, error } = await supabase
-      .from('mesas')
-      .insert([
-        { 
-          numero: parseInt(novoNumero), 
-          ativa: true 
-          // Se o seu ID não for automático, teríamos que gerar um aqui
-        }
-      ])
-      .select();
-
-    if (error) {
-      console.error('Erro do Supabase:', error);
-      throw error;
+    if (!novoNumero) {
+      Alert.alert('Aviso', 'Digite o número da mesa.');
+      return;
     }
 
-    console.log('Mesa adicionada com sucesso:', data);
-    setModalVisible(false);
-    setNovoNumero('');
-    fetchMesas();
-    Alert.alert('Sucesso', `Mesa ${novoNumero} adicionada!`);
-  } catch (error: any) {
-    // Isso vai nos mostrar o erro real (ex: duplicata, falta de coluna, etc)
-    Alert.alert('Erro ao adicionar', error.message || 'Erro desconhecido');
-  }
-};
+    try {
+      const { error } = await supabase
+        .from('mesas')
+        .insert([{ numero: parseInt(novoNumero), ativa: true }]);
 
+      if (error) throw error;
 
-  // FUNÇÃO PARA EXCLUIR MESA (DELETE)
+      setModalVisible(false);
+      setNovoNumero('');
+      fetchMesas();
+      Alert.alert('Sucesso', `Mesa ${novoNumero} adicionada!`);
+    } catch (error: any) {
+      Alert.alert('Erro ao adicionar', error.message);
+    }
+  };
+
+  const handleDesocuparMesa = async (mesa: Mesa) => {
+    Alert.alert(
+      'Desocupar Mesa', 
+      `Deseja realmente marcar a Mesa ${mesa.numero} como LIVRE? Isso não cancela pedidos em aberto.`, 
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Desocupar', 
+          style: 'destructive', 
+          onPress: async () => {
+            const { error } = await supabase
+              .from('mesas')
+              .update({ ativa: true })
+              .eq('id', mesa.id);
+            
+            if (error) Alert.alert('Erro', error.message);
+            else fetchMesas();
+          }
+        }
+      ]
+    );
+  };
+
   const handleExcluirMesa = (id: string, numero: number) => {
-    Alert.alert('Excluir Mesa', `Deseja realmente remover a Mesa ${numero}?`, [
+    Alert.alert('Excluir Mesa', `Deseja realmente remover permanentemente a Mesa ${numero}?`, [
       { text: 'Cancelar', style: 'cancel' },
       { 
         text: 'Excluir', 
@@ -93,30 +99,39 @@ export default function MesasScreen() {
   };
 
   const renderMesa = ({ item }: { item: Mesa }) => (
-    <TouchableOpacity
-      style={[styles.mesaCard, !item.ativa && styles.mesaInativa]}
-      onLongPress={() => handleExcluirMesa(item.id, item.numero)} // Exclui ao segurar o dedo
-      onPress={() => {
-        if (item.ativa) {
+    <View style={[styles.mesaCard, !item.ativa && styles.mesaInativa]}>
+      <TouchableOpacity
+        style={styles.mesaClickArea}
+        onLongPress={() => handleExcluirMesa(item.id, item.numero)}
+        onPress={() => {
+          // Agora permitimos adicionar novos pedidos mesmo se a mesa estiver ocupada
           router.push({
-            pathname: '/novo-pedido',
+            pathname: '/novo-pedido' as any,
             params: { mesaId: item.id, mesaNumero: item.numero }
           });
-        } else {
-          Alert.alert('Mesa Ocupada', 'Esta mesa já possui um pedido em aberto.');
-        }
-      }}
-    >
-      <View style={styles.mesaIcon}>
-        <Users size={24} color={item.ativa ? '#1C74D4' : '#9CA3AF'} />
-      </View>
-      <Text style={[styles.mesaNumero, !item.ativa && styles.textInativo]}>Mesa {item.numero}</Text>
-      <View style={[styles.statusBadge, { backgroundColor: item.ativa ? '#D1FAE5' : '#FEE2E2' }]}>
-        <Text style={[styles.statusText, { color: item.ativa ? '#059669' : '#EF4444' }]}>
-          {item.ativa ? 'Livre' : 'Ocupada'}
-        </Text>
-      </View>
-    </TouchableOpacity>
+        }}
+      >
+        <View style={styles.mesaIcon}>
+          <Users size={24} color={item.ativa ? '#1C74D4' : '#9CA3AF'} />
+        </View>
+        <Text style={[styles.mesaNumero, !item.ativa && styles.textInativo]}>Mesa {item.numero}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: item.ativa ? '#D1FAE5' : '#FEE2E2' }]}>
+          <Text style={[styles.statusText, { color: item.ativa ? '#059669' : '#EF4444' }]}>
+            {item.ativa ? 'Livre' : 'Ocupada'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      {!item.ativa && (
+        <TouchableOpacity 
+          style={styles.desocuparBtn} 
+          onPress={() => handleDesocuparMesa(item)}
+        >
+          <LogOut size={16} color="#EF4444" />
+          <Text style={styles.desocuparText}>Liberar</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   return (
@@ -126,8 +141,6 @@ export default function MesasScreen() {
           <ChevronLeft size={28} color="#1C74D4" />
         </TouchableOpacity>
         <Text style={styles.title}>Mesas</Text>
-        
-        {/* BOTÃO DE ADICIONAR MESA */}
         <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
           <Plus size={24} color="#FFF" />
         </TouchableOpacity>
@@ -147,7 +160,6 @@ export default function MesasScreen() {
         />
       )}
 
-      {/* MODAL PARA NOVA MESA */}
       <Modal visible={modalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -195,20 +207,31 @@ const styles = StyleSheet.create({
   mesaCard: { 
     backgroundColor: '#FFF', 
     width: '48%', 
-    padding: 20, 
     borderRadius: 16, 
-    alignItems: 'center', 
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    elevation: 2
+    elevation: 2,
+    overflow: 'hidden'
   },
-  mesaInativa: { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
+  mesaClickArea: { padding: 20, alignItems: 'center' },
+  mesaInativa: { backgroundColor: '#F9FAFB', borderColor: '#D1D5DB' },
   mesaIcon: { marginBottom: 12 },
   mesaNumero: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
   textInativo: { color: '#6B7280' },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 12, fontWeight: '600' },
+  desocuparBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    padding: 10, 
+    backgroundColor: '#FEE2E2',
+    borderTopWidth: 1,
+    borderTopColor: '#FECACA',
+    gap: 6
+  },
+  desocuparText: { color: '#EF4444', fontSize: 13, fontWeight: '700' },
   emptyText: { textAlign: 'center', marginTop: 40, color: '#6B7280' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalContent: { backgroundColor: '#FFF', borderRadius: 16, padding: 20 },
